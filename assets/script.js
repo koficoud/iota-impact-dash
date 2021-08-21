@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const dashAppContent = document.querySelector('#_dash-app-content');
+    const dashAppContent = document.querySelector('body');
 
     // Create an observer instance
     const observer = new MutationObserver(function (mutations) {
