@@ -58,7 +58,8 @@ function domRefreshed() {
              * Triggers when an iframe is loaded
              */
             const iframeLoaded = (event) => {
-                if (event.target.contentWindow.window.length === 0) {
+                if (event.target.contentWindow.window.length === 0
+                    || event.target.contentWindow.window.document.body.children.length === 0) {
                     // Set fallback URL
                     iframe.src = iframe.dataset.fallback;
 
