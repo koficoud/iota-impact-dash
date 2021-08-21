@@ -104,6 +104,7 @@ avg_employees_states_count = companies_locations.groupby(['State_y'], as_index=F
 # Set the max companies by state
 max_companies_state = avg_employees_states_count['size'].max()
 
+# Add bubble indicators to the map
 data.append(go.Scattermapbox(
     lat=avg_employees_states['Latitude'],
     lon=avg_employees_states['Longitud'],
@@ -148,9 +149,9 @@ All the information tha will be rendered on the browser
 
 def category_employees(current_employees):
     """
-    Get category by current employees label
-    :param current_employees:
-    :return:
+    Get category label by current employees amount
+    :param current_employees: Number of current employees
+    :return: e.g. 1-50, 1001-500, etc.
     """
     for employees_range in employees_per_company:
         if employees_range[0] <= current_employees <= employees_range[1]:
@@ -160,9 +161,9 @@ def category_employees(current_employees):
 
 def company_domain(company_name, domain):
     """
-    Format company URL
-    :param company_name:
-    :param domain:
+    Format company URL based on company name and bing search URL or simple return the domain
+    :param company_name: The company name
+    :param domain: The company URL
     :return:
     """
     if domain == 'missing':
@@ -172,13 +173,20 @@ def company_domain(company_name, domain):
 
 
 def top_10_companies_tabs(industry):
+    """
+    Create the HTML structure (tabs) with the top 10 companies, based on the industry type
+    :param industry: Industry type, can be all
+    :return: HTML elements
+    """
     filtered_companies = pd.DataFrame()
     tabs = []
     tabs_content = []
 
+    # All industries
     if industry == 'all':
         filtered_companies = companies.nlargest(10, 'Current employee estimate')
 
+    # Generate tabs and content
     for index, row in filtered_companies.iterrows():
         tabs.append(
             html.Li(className='tab', children=[
@@ -189,6 +197,7 @@ def top_10_companies_tabs(industry):
                 )
             ])
         )
+
         tabs_content.append(
             html.Div(id=row['Domain'], className='col s12', children=[
                 html.Ul(className='collection with-header', children=[
@@ -234,6 +243,7 @@ def top_10_companies_tabs(industry):
     ])
 
 
+# The food and beverages page
 page = html.Div(className='row card', children=[
     html.Div(className='card-content', children=[
         html.Div(className='col s12', children=[
@@ -248,10 +258,12 @@ page = html.Div(className='row card', children=[
                 className='descriptive-text',
                 children=[
                     html.Span(
-                        'The size of the circles indicates the number of companies in the state, the larger the circle the more companies there are.'),
+                        'The size of the circles indicates the number of companies in the state, the larger the '
+                        'circle the more companies there are.'),
                     html.Br(),
                     html.Span(
-                        'While the color indicates: in red a low number of employees and in dark green a high number of employees per company.')
+                        'While the color indicates: in red a low number of employees and in dark green a high number '
+                        'of employees per company.')
                 ],
             ),
         ]),
