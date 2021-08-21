@@ -1,3 +1,10 @@
 .js-plotly-plot .plotly .modebar {
     left: 92px;
 }
+.descriptive-text {
+    font-size: 12px;
+    margin: 15px !important;
+}
+#top-companies {
+    margin-top: 15px;
+}

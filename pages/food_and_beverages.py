@@ -109,7 +109,7 @@ data.append(go.Scattermapbox(
     lon=avg_employees_states['Longitud'],
     mode='markers',
     marker=go.scattermapbox.Marker(
-        size=avg_employees_states_count['size']/max_companies_state*100*1.7,
+        size=avg_employees_states_count['size'] / max_companies_state * 100 * 1.7,
         color=avg_employees_states['Current employee estimate'],
         colorscale=color_scale_bubbles,
         symbol='circle',
@@ -144,12 +144,130 @@ map_figure.update_layout(
 The layout page.
 All the information tha will be rendered on the browser
 """
-page = html.Div(className='row', children=[
-    html.Div(className='col s12 card', children=[
-        html.Div(className='card-content', children=[
+
+
+def category_employees(current_employees):
+    """
+    Get category by current employees label
+    :param current_employees:
+    :return:
+    """
+    for employees_range in employees_per_company:
+        if employees_range[0] <= current_employees <= employees_range[1]:
+            lte = '+' if math.isinf(employees_range[1]) else '-{}'.format(employees_range[1])
+            return '{}{}'.format(employees_range[0], lte)
+
+
+def company_domain(company_name, domain):
+    """
+    Format company URL
+    :param company_name:
+    :param domain:
+    :return:
+    """
+    if domain == 'missing':
+        return 'https://www.bing.com/news/search?q={}&FORM=HDRSC6'.format(company_name)
+    else:
+        return 'https://{}'.format(domain)
+
+
+def top_10_companies_tabs(industry):
+    filtered_companies = pd.DataFrame()
+    tabs = []
+    tabs_content = []
+
+    if industry == 'all':
+        filtered_companies = companies.nlargest(10, 'Current employee estimate')
+
+    for index, row in filtered_companies.iterrows():
+        tabs.append(
+            html.Li(className='tab', children=[
+                html.A(
+                    className='active' if index == 0 else '',
+                    href='#{}'.format(row['Domain']),
+                    children=row['Name'],
+                )
+            ])
+        )
+        tabs_content.append(
+            html.Div(id=row['Domain'], className='col s12', children=[
+                html.Ul(className='collection with-header', children=[
+                    html.Li(className='collection-header', children=[
+                        html.H4('{}, Founding in {}'.format(row['Name'], row['Year founded'])),
+                    ]),
+                    html.Li(
+                        className='collection-item',
+                        children='Located in {}'.format(row['Id_locality'])
+                    ),
+                    html.Li(
+                        className='collection-item',
+                        children='Linkedin: {}'.format(row['Linkedin url'])
+                    ),
+                    html.Li(
+                        className='collection-item',
+                        children='Sub-industry: {}'.format(row['Industry'])
+                    ),
+                    html.Li(
+                        className='collection-item',
+                        children='Category by current employees: {}'.format(
+                            category_employees(row['Current employee estimate']))
+                    ),
+                    html.Li(
+                        className='collection-item',
+                        children='Current employees: {}'.format(row['Current employee estimate'])
+                    ),
+                    html.Iframe(
+                        src=company_domain(row['Name'], row['Domain']),
+                        **{'data-fallback': company_domain(row['Name'], 'missing')},
+                        width='100%',
+                        height='500px',
+                    )
+                ]),
+            ])
+        )
+
+    return html.Div(className='row', children=[
+        html.Div(className='col s12', children=[
+            html.Ul(className='tabs', children=tabs)
+        ]),
+        html.Div(children=tabs_content),
+    ])
+
+
+page = html.Div(className='row card', children=[
+    html.Div(className='card-content', children=[
+        html.Div(className='col s12', children=[
             html.Span(className='card-title', children='Food and beverages'),
+        ]),
+        html.Div(className='col s12', children=[
             # Insert map on the HTML page
             dcc.Graph(id="map", figure=map_figure),
+        ]),
+        html.Div(className='col s8', children=[
+            html.P(
+                className='descriptive-text',
+                children=[
+                    html.Span(
+                        'The size of the circles indicates the number of companies in the state, the larger the circle the more companies there are.'),
+                    html.Br(),
+                    html.Span(
+                        'While the color indicates: in red a low number of employees and in dark green a high number of employees per company.')
+                ],
+            ),
+        ]),
+        html.Div(className='col s4 center-align', children=[
+            html.Button(
+                id='top-companies',
+                className='btn modal-trigger blue darken-4 waves-effect',
+                **{'data-target': 'modal1'},
+                children='Read more about Top 10 companies',
+            ),
+            html.Div(id='modal1', className='modal', children=[
+                html.Div(className='modal-content', children=[
+                    html.H4('Top 10 companies'),
+                    html.Div(id='top-10-companies', children=top_10_companies_tabs('all')),
+                ]),
+            ]),
         ]),
     ]),
 ])
