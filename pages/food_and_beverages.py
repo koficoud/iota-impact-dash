@@ -4,6 +4,7 @@ import os
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 from urllib.request import urlopen
 
@@ -18,6 +19,7 @@ with urlopen(
     states = json.load(response)
 # Create data frame with the companies
 companies = pd.read_excel(os.path.join(dirname, '../assets/food-and-beverage.xlsx'))
+companies['Year founded'] = companies['Year founded'].replace('missing', '0').astype(int)
 # Create data frame with the locations (lat, lng, states).
 locations = pd.read_excel(os.path.join(dirname, '../assets/long-and-lat-by-state.xlsx'), dtype={'Fip': str})
 
@@ -26,11 +28,9 @@ Prepare data frames that will be processed to be inserted into graphics and maps
 And set configuration data for insertion in the dashboard. 
 """
 # Join the two files from above by using state code (e.g. TX - Dallas Texas)
-companies_locations = pd.merge(companies, locations, how='inner', left_on=['State'], right_on=['Code'])
+companies_locations = pd.merge(companies, locations, how='left', left_on=['State'], right_on=['Code'])
 # Mapbox requires that the fip code always have two digits then add leading zeros
 companies_locations['Fip'] = companies_locations['Fip'].str.zfill(2)
-# Exclude companies with invalid locations (e.g. beverages)
-companies_locations = companies_locations[companies_locations['Fip'].notna()]
 # Color scale to be used on the map. Specifically in the grouping of employees by companies
 color_scale = (
     ((0.0, '#000000'), (1.0, '#000000')),
@@ -58,6 +58,73 @@ Create graphic object like maps and bar charts.
 Add the graphic object data to the Figure.
 The Figure will be inserted in the layout page.
 """
+
+
+def calculate_bubble(state_companies, max_state_companies):
+    """
+    Calculate bubble size using the number of companies by state
+    :param state_companies: Total companies by state
+    :param max_state_companies: Max companies found in a state
+    :return: Bubble size
+    """
+    bubble_size = state_companies / max_state_companies * 100 * 1.7
+
+    if bubble_size < 10:
+        return 10
+    elif bubble_size > 40:
+        return 40
+
+    return bubble_size
+
+
+def business_foundation_chart(employees_ranges, name_states, locality_names):
+    """
+    Create business foundation by year chart
+    :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
+    :param name_states: Iterable with the state or None for all.
+    :param locality_names: Iterable with the localities or None for all.
+    :return: Figure instance with the chart
+    """
+    top_5 = ['Retail', 'Food and beverages', 'Restaurants', 'Food production', 'Wholesale']
+    # Filter by top 5 industries
+    years = companies_locations[companies_locations['Industry'].isin(top_5)]
+
+    # Filter by employees ranges
+    if employees_ranges is not None:
+        years = years[years['Current employee estimate'].between(employees_ranges[0], employees_ranges[1])]
+    # Filter by name states
+    if name_states is not None:
+        years = years[years['Name_stateuniversity'].isin(name_states)]
+    # Filter by locality
+    if locality_names is not None:
+        years = years[years['Locality'].isin(locality_names)]
+
+    # Count companies in founded year groups
+    years_groups = years.groupby(['Year founded', 'Industry'], as_index=False).size()
+    # Group by founded year
+    years = years.groupby(['Year founded', 'Industry'], as_index=False).mean()
+    # Select between 2000 and 2018 years lapse
+    years = years[years['Year founded'].between(2000, 2018)]
+    years_groups = years_groups[years_groups['Year founded'].between(2000, 2018)]
+    # Merge count groups and years
+    business_foundation_data = years.merge(years_groups, how='inner', on='Year founded')
+
+    # Before create charts, rename column for best reading
+    business_foundation_data = business_foundation_data.rename(columns={'size': 'Companies', 'Industry_y': 'Industry'})
+
+    # Create chart
+    fig = px.line(
+        business_foundation_data,
+        x='Year founded',
+        y='Companies',
+        color='Industry',
+        title='Business foundation by year (Top 5 industries)',
+    )
+    fig.update_traces(mode="markers+lines")
+
+    return fig
+
+
 # Graphic objects
 data = []
 # Iterator count
@@ -110,7 +177,8 @@ data.append(go.Scattermapbox(
     lon=avg_employees_states['Longitud'],
     mode='markers',
     marker=go.scattermapbox.Marker(
-        size=avg_employees_states_count['size'] / max_companies_state * 100 * 1.7,
+        size=avg_employees_states_count['size'].apply(
+            lambda state_companies: calculate_bubble(state_companies, max_companies_state)),
         color=avg_employees_states['Current employee estimate'],
         colorscale=color_scale_bubbles,
         symbol='circle',
@@ -280,6 +348,9 @@ page = html.Div(className='row card', children=[
                     html.Div(id='top-10-companies', children=top_10_companies_tabs('all')),
                 ]),
             ]),
+        ]),
+        html.Div(className='col s9', children=[
+            dcc.Graph(id='left-chart', figure=business_foundation_chart(None, None, None))
         ]),
     ]),
 ])
