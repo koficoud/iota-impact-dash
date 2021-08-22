@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from urllib.request import urlopen
+from app import app
+from dash.dependencies import Output, Input
 
 """
 Get the initial files to extract the data.
@@ -44,13 +46,13 @@ color_scale = (
 color_scale_bubbles = ['#fa4032', '#e0bdbb', '#8cc0de', '#2c5c8a']
 # Number of employees per company groups (e.g. 1-50 employees)
 employees_per_company = (
-    (1, 50),
-    (51, 200),
-    (201, 500),
-    (501, 1000),
-    (1001, 5000),
-    (5001, 10000),
-    (10001, math.inf)
+    (1, 50, '1-50'),
+    (51, 200, '51-200'),
+    (201, 500, '201-500'),
+    (501, 1000, '501-1000'),
+    (1001, 5000, '100-5000'),
+    (5001, 10000, '5001-10000'),
+    (10001, math.inf, '10001+')
 )
 
 """
@@ -77,9 +79,28 @@ def calculate_bubble(state_companies, max_state_companies):
     return bubble_size
 
 
+def filter_employees_ranges(rows, employees_ranges):
+    """
+    Filter rows by employees range
+    :param rows: Companies rows
+    :param employees_ranges: Employees ranges
+    :return:
+    """
+    if employees_ranges is not None:
+        filtered = pd.DataFrame()
+
+        for employee_range in employees_ranges:
+            filtered = filtered.append(
+                rows[rows['Current employee estimate'].between(employee_range[0], employee_range[1])])
+
+        return filtered
+
+    return rows
+
+
 def business_foundation_chart(employees_ranges, name_states, locality_names):
     """
-    Create business foundation by year chart
+    Create business foundation by year chart (top 5)
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
     :param name_states: Iterable with the state or None for all.
     :param locality_names: Iterable with the localities or None for all.
@@ -90,11 +111,12 @@ def business_foundation_chart(employees_ranges, name_states, locality_names):
     years = companies_locations[companies_locations['Industry'].isin(top_5)]
 
     # Filter by employees ranges
-    if employees_ranges is not None:
-        years = years[years['Current employee estimate'].between(employees_ranges[0], employees_ranges[1])]
+    years = filter_employees_ranges(years, employees_ranges)
+
     # Filter by name states
     if name_states is not None:
         years = years[years['Name_stateuniversity'].isin(name_states)]
+
     # Filter by locality
     if locality_names is not None:
         years = years[years['Locality'].isin(locality_names)]
@@ -125,89 +147,153 @@ def business_foundation_chart(employees_ranges, name_states, locality_names):
     return fig
 
 
-# Graphic objects
-data = []
-# Iterator count
-i = 0
-for employees in employees_per_company:
-    # Filter companies by employees (e.g. between 1 and 50)
-    companies_locations_f = companies_locations[
-        companies_locations['Current employee estimate'].between(employees[0], employees[1])
-    ]
+def get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names):
+    biggest_companies = companies_locations
 
-    # Extract fip codes
-    fip = companies_locations_f['Fip']
-    # Extract states
-    state = companies_locations_f['State_y']
-    # Extract Current employee estimate
-    employee_estimate = companies_locations_f['Current employee estimate']
+    # Filter by industries
+    if industries is not None:
+        biggest_companies = biggest_companies[biggest_companies['Industry'].isin(industries)]
+    # Filter by employees ranges
+    biggest_companies = filter_employees_ranges(biggest_companies, employees_ranges)
+    # Filter by name states
+    if name_states is not None:
+        biggest_companies = biggest_companies[biggest_companies['Name_stateuniversity'].isin(name_states)]
+    # Filter by locality name
+    if locality_names is not None:
+        biggest_companies = biggest_companies[biggest_companies['Locality'].isin(locality_names)]
 
-    # Name format to be used on the gray scale
-    gte = '+' if math.isinf(employees[1]) else '-{}'.format(employees[1])
-    name = '''
-        <i>{}{} Employees</i> <br>
-        <b>{} Companies</b> <br>
-    '''.format(employees[0], gte, len(companies_locations_f))
+    biggest_companies = biggest_companies.sort_values(by=['Current employee estimate'], ascending=False).head(10)
 
-    # Create grey scale values grouping by employees range
-    data.append(go.Choroplethmapbox(
-        geojson=states,
-        locations=fip,
-        z=employee_estimate,
-        showlegend=True,
-        name=name,
-        colorscale=color_scale[i],
-        showscale=False,
-        hovertemplate=state,
-    ))
+    return biggest_companies
 
-    # Update iterator count
-    i = i + 1
 
-# AVG employees by state
-avg_employees_states = companies_locations.groupby(['State_y'], as_index=False).mean().round(0)
-# Count occurrences in the group process (number of companies)
-avg_employees_states_count = companies_locations.groupby(['State_y'], as_index=False).size()
-# Set the max companies by state
-max_companies_state = avg_employees_states_count['size'].max()
+def biggest_companies_chart(industries, employees_ranges, name_states, locality_names):
+    """
+    Create biggest companies chart (top 10)
+    :param industries: Iterable with industries or None for all.
+    :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
+    :param name_states: Iterable with the state or None for all.
+    :param locality_names: Iterable with the localities or None for all.
+    :return: Figure instance with the chart
+    """
+    # Fetch companies data
+    biggest_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names) \
+        .sort_values(by=['Current employee estimate'], ascending=True)
 
-# Add bubble indicators to the map
-data.append(go.Scattermapbox(
-    lat=avg_employees_states['Latitude'],
-    lon=avg_employees_states['Longitud'],
-    mode='markers',
-    marker=go.scattermapbox.Marker(
-        size=avg_employees_states_count['size'].apply(
-            lambda state_companies: calculate_bubble(state_companies, max_companies_state)),
-        color=avg_employees_states['Current employee estimate'],
-        colorscale=color_scale_bubbles,
-        symbol='circle',
-        showscale=True,
-        colorbar=go.scattermapbox.marker.ColorBar(
-            x=-0.1,
-            title=go.scattermapbox.marker.colorbar.Title(
-                text='Number of employees per company',
-                side='right',
+    # Create chart
+    fig = go.Figure(go.Bar(
+        x=biggest_companies['Current employee estimate'],
+        y=biggest_companies['Name'],
+        orientation='h'))
+
+    return fig
+
+
+def companies_states_map(company_names, industries, employees_ranges, name_states, locality_names):
+    # Set companies with locations
+    companies_states = companies_locations
+
+    # Filter by company names
+    if company_names is not None:
+        companies_states = companies_states[companies_states['Name'].isin(company_names)]
+    # Filter by industries
+    if industries is not None:
+        companies_states = companies_states[companies_states['Industry'].isin(industries)]
+    # Filter by employees ranges
+    companies_states = filter_employees_ranges(companies_states, employees_ranges)
+    # Filter by name states
+    if name_states is not None:
+        companies_states = companies_states[companies_states['Name_stateuniversity'].isin(name_states)]
+    # Filter by locality name
+    if locality_names is not None:
+        companies_states = companies_states[companies_states['Locality'].isin(locality_names)]
+
+    # Graphic objects
+    data = []
+    # Iterator count
+    i = 0
+    for employees in employees_per_company:
+        # Filter companies by employees (e.g. between 1 and 50)
+        companies_locations_f = companies_states[
+            companies_states['Current employee estimate'].between(employees[0], employees[1])
+        ]
+
+        # Extract fip codes
+        fip = companies_locations_f['Fip']
+        # Extract states
+        state = companies_locations_f['State_y']
+        # Extract Current employee estimate
+        employee_estimate = companies_locations_f['Current employee estimate']
+
+        # Name format to be used on the gray scale
+        gte = '+' if math.isinf(employees[1]) else '-{}'.format(employees[1])
+        name = '''
+            <i>{}{} Employees</i> <br>
+            <b>{} Companies</b> <br>
+        '''.format(employees[0], gte, len(companies_locations_f))
+
+        # Create grey scale values grouping by employees range
+        data.append(go.Choroplethmapbox(
+            geojson=states,
+            locations=fip,
+            z=employee_estimate,
+            showlegend=True,
+            name=name,
+            colorscale=color_scale[i],
+            showscale=False,
+            hovertemplate=state,
+        ))
+
+        # Update iterator count
+        i = i + 1
+
+    # AVG employees by state
+    avg_employees_states = companies_states.groupby(['State_y'], as_index=False).mean().round(0)
+    # Count occurrences in the group process (number of companies)
+    avg_employees_states_count = companies_states.groupby(['State_y'], as_index=False).size()
+    # Set the max companies by state
+    max_companies_state = avg_employees_states_count['size'].max()
+
+    # Add bubble indicators to the map
+    data.append(go.Scattermapbox(
+        lat=avg_employees_states['Latitude'],
+        lon=avg_employees_states['Longitud'],
+        mode='markers',
+        marker=go.scattermapbox.Marker(
+            size=avg_employees_states_count['size'].apply(
+                lambda state_companies: calculate_bubble(state_companies, max_companies_state)),
+            color=avg_employees_states['Current employee estimate'],
+            colorscale=color_scale_bubbles,
+            symbol='circle',
+            showscale=True,
+            colorbar=go.scattermapbox.marker.ColorBar(
+                x=-0.1,
+                title=go.scattermapbox.marker.colorbar.Title(
+                    text='Number of employees per company',
+                    side='right',
+                ),
             ),
         ),
-    ),
-    name='',
-    text='Name of state: <b>' + avg_employees_states['State_y'] + '</b><br>' +
-         'Employees per company: <b>' + avg_employees_states['Current employee estimate'].astype(str) + '</b><br>' +
-         'Number of companies: <b>' + avg_employees_states_count['size'].astype(str),
-    showlegend=False,
-))
+        name='',
+        text='Name of state: <b>' + avg_employees_states['State_y'] + '</b><br>' +
+             'Employees per company: <b>' + avg_employees_states['Current employee estimate'].astype(str) + '</b><br>' +
+             'Number of companies: <b>' + avg_employees_states_count['size'].astype(str),
+        showlegend=False,
+    ))
 
-# Create figure element
-map_figure = go.Figure(data)
-# Update Mapbox settings
-map_figure.update_layout(
-    mapbox_style='carto-positron',
-    mapbox_zoom=3,
-    height=600,
-    mapbox_center={'lat': 37.0902, 'lon': -95.7129},
-    margin={'r': 0, 't': 0, 'l': 0, 'b': 0},
-)
+    # Create figure element
+    map_figure = go.Figure(data)
+    # Update Mapbox settings
+    map_figure.update_layout(
+        mapbox_style='carto-positron',
+        mapbox_zoom=3,
+        height=600,
+        mapbox_center={'lat': 37.0902, 'lon': -95.7129},
+        margin={'r': 0, 't': 0, 'l': 0, 'b': 0},
+    )
+
+    return map_figure
+
 
 """
 The layout page.
@@ -240,19 +326,15 @@ def company_domain(company_name, domain):
         return 'https://{}'.format(domain)
 
 
-def top_10_companies_tabs(industry):
+def top_10_companies_tabs(industries, employees_ranges, name_states, locality_names):
     """
     Create the HTML structure (tabs) with the top 10 companies, based on the industry type
     :param industry: Industry type, can be all
     :return: HTML elements
     """
-    filtered_companies = pd.DataFrame()
+    filtered_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names)
     tabs = []
     tabs_content = []
-
-    # All industries
-    if industry == 'all':
-        filtered_companies = companies.nlargest(10, 'Current employee estimate')
 
     # Generate tabs and content
     for index, row in filtered_companies.iterrows():
@@ -298,6 +380,7 @@ def top_10_companies_tabs(industry):
                         **{'data-fallback': company_domain(row['Name'], 'missing')},
                         width='100%',
                         height='500px',
+                        sandbox='allow-forms allow-scripts',
                     )
                 ]),
             ])
@@ -311,15 +394,254 @@ def top_10_companies_tabs(industry):
     ])
 
 
+def company_names_options(search):
+    """
+    Perform a search in the companies and format to options dropdown
+    Create a dropdown with company names data
+    :param search: Search string
+    :return:
+    """
+    options = []
+
+    # Catch empty string
+    if search == '':
+        return options
+
+    # Perform search
+    if search is not None:
+        # Second find by contains
+        company_names = companies[companies['Name'].str.contains(search, na=False, case=False) == True].head(100)
+
+        # Append companies to options dropdown
+        for company_name in company_names['Name']:
+            options.append({
+                'label': str(company_name),
+                'value': str(company_name),
+            })
+
+    return options
+
+
+@app.callback(
+    [
+        Output('company_names_dropdown', 'options'),
+        Output('company_names_dropdown', 'placeholder'),
+    ],
+    Input('company_name_input', 'value'))
+def update_company_names_dropdown(company_name):
+    """
+    Listen input changes on company name input
+    :param company_name: The name of company
+    :return:
+    """
+    company_names = company_names_options(company_name)
+    value = 'First perform a search'
+    if len(company_names) > 0:
+        value = '{} and {} more found...'.format(company_names[0]['value'], len(company_names))
+
+    return company_names, value
+
+
+def industries_dropdown():
+    """
+    Create a dropdown element with industry options
+    :return: Dropdown
+    """
+    # Sort by industries
+    industries = companies.sort_values(by='Industry')
+    # Extract unique values
+    industries = industries['Industry'].unique()
+    options = []
+
+    # Append industries to options dropdown
+    for industry in industries:
+        options.append({
+            'label': str(industry),
+            'value': str(industry),
+        })
+
+    return dcc.Dropdown(
+        options=options,
+        id='industries_dropdown',
+        placeholder='Industries',
+        multi=True,
+    )
+
+
+def range_employees_dropdown():
+    """
+    Create a dropdown element with range employees options
+    :return: Dropdown
+    """
+    options = []
+
+    # Append ranges top options dropdown
+    for employees_range in employees_per_company:
+        options.append({
+            'label': employees_range[2],
+            'value': employees_range[2],
+        })
+
+    return dcc.Dropdown(
+        options=options,
+        id='range_employees_dropdown',
+        placeholder='Number of employees',
+        multi=True,
+    )
+
+
+def states_dropdown():
+    """
+    Create a dropdown element with state options
+    :return: Dropdown
+    """
+    # Group by state
+    state_names = companies_locations.groupby(['Name_stateuniversity'], as_index=False).mean()
+    # Sort by state name
+    state_names = state_names.sort_values(by='Name_stateuniversity')
+    options = []
+
+    # Append states to options dropdown
+    for state_name in state_names['Name_stateuniversity']:
+        options.append({
+            'label': str(state_name),
+            'value': str(state_name),
+        })
+
+    return dcc.Dropdown(
+        options=options,
+        id='states_dropdown',
+        placeholder='States',
+        multi=True,
+    )
+
+
+def localities_dropdown():
+    """
+    Create a dropdown element with localities options
+    :return: Dropdown
+    """
+    # Group by state
+    locality_names = companies.groupby(['Locality'], as_index=False).mean()
+    # Sort by state name
+    locality_names = locality_names.sort_values(by='Locality')
+    options = []
+
+    # Append states to options dropdown
+    for locality_name in locality_names['Locality']:
+        options.append({
+            'label': str(locality_name),
+            'value': str(locality_name),
+        })
+
+    return dcc.Dropdown(
+        options=options,
+        id='localities_dropdown',
+        placeholder='Localities',
+        multi=True,
+    )
+
+
+@app.callback(
+    [
+        Output('left-chart', 'figure'),
+        Output('right-chart', 'figure'),
+        Output('map', 'figure'),
+        Output('top-10-companies', 'children'),
+        Output('modal-title', 'children'),
+    ],
+    [
+        Input('company_names_dropdown', 'value'),
+        Input('industries_dropdown', 'value'),
+        Input('range_employees_dropdown', 'value'),
+        Input('states_dropdown', 'value'),
+        Input('localities_dropdown', 'value'),
+    ]
+)
+def update_graphs(company_names, industries, range_employees, state_names, localities):
+    ranges_values = {
+        '1-50': (1, 50),
+        '51-200': (51, 200),
+        '201-500': (201, 500),
+        '501-1000': (501, 1000),
+        '100-5000': (1001, 5000),
+        '5001-10000': (5001, 10000),
+        '10001+': (10001, math.inf),
+    }
+
+    # Prevent empty lists
+    if company_names is not None and len(company_names) == 0:
+        company_names = None
+    if industries is not None and len(industries) == 0:
+        industries = None
+    if state_names is not None and len(state_names) == 0:
+        state_names = None
+    if localities is not None and len(localities) == 0:
+        localities = None
+
+    # Set employees ranges
+    employees_ranges = []
+    if range_employees is None or len(range_employees) == 0:
+        employees_ranges = None
+    else:
+        for ranges in range_employees:
+            employees_ranges.append(ranges_values[ranges])
+
+    # Format modal title for tabs
+    industries_label = 'All'
+    if industries is not None:
+        industries_label = ', '.join(industries)
+
+    modal_title = 'Top 10 companies {}'.format(industries_label)
+
+    return \
+        business_foundation_chart(employees_ranges, state_names, localities), \
+        biggest_companies_chart(industries, employees_ranges, state_names, localities), \
+        companies_states_map(company_names, industries, employees_ranges, state_names, localities), \
+        top_10_companies_tabs(industries, employees_ranges, state_names, localities), \
+        modal_title
+
+
 # The food and beverages page
 page = html.Div(className='row card', children=[
     html.Div(className='card-content', children=[
         html.Div(className='col s12', children=[
             html.Span(className='card-title', children='Food and beverages'),
         ]),
+        # Select element to filtering data
+        html.Div(className='row', children=[
+            html.Div(className='col s12', children=[
+                dcc.Input(
+                    id='company_name_input',
+                    type='text',
+                    placeholder='Search by name of the company',
+                    autoComplete='off',
+                ),
+                dcc.Dropdown(
+                    options=[],
+                    id='company_names_dropdown',
+                    placeholder='Company name results...',
+                    multi=True,
+                ),
+            ]),
+        ]),
+        html.Div(className='row', children=[
+            html.Div(className='col s3', children=[
+                industries_dropdown(),
+            ]),
+            html.Div(className='col s3', children=[
+                range_employees_dropdown(),
+            ]),
+            html.Div(className='col s3', children=[
+                states_dropdown(),
+            ]),
+            html.Div(className='col s3', children=[
+                localities_dropdown(),
+            ]),
+        ]),
         html.Div(className='col s12', children=[
             # Insert map on the HTML page
-            dcc.Graph(id="map", figure=map_figure),
+            dcc.Graph(id='map', figure=companies_states_map(None, None, None, None, None)),
         ]),
         html.Div(className='col s8', children=[
             html.P(
@@ -344,13 +666,16 @@ page = html.Div(className='row card', children=[
             ),
             html.Div(id='modal1', className='modal', children=[
                 html.Div(className='modal-content', children=[
-                    html.H4('Top 10 companies'),
-                    html.Div(id='top-10-companies', children=top_10_companies_tabs('all')),
+                    html.H4(id='modal-title', children='Top 10 companies All'),
+                    html.Div(id='top-10-companies', children=top_10_companies_tabs(None, None, None, None)),
                 ]),
             ]),
         ]),
-        html.Div(className='col s9', children=[
+        html.Div(className='col s8', children=[
             dcc.Graph(id='left-chart', figure=business_foundation_chart(None, None, None))
+        ]),
+        html.Div(className='col s4', children=[
+            dcc.Graph(id='right-chart', figure=biggest_companies_chart(None, None, None, None))
         ]),
     ]),
 ])

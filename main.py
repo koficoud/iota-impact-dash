@@ -2,24 +2,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import pages
-
-
-external_stylesheets = [
-    'https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css',
-    '/style.css'
-]
-external_scripts = [
-    'https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js'
-]
-
-# Start the Dash app
-app = dash.Dash(
-    __name__,
-    external_stylesheets=external_stylesheets,
-    external_scripts=external_scripts,
-)
-server = app.server
-
+from app import app
 
 # Main wrapper
 app.layout = html.Div(className='container', children=[
