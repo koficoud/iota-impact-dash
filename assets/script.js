@@ -36,13 +36,14 @@ function domRefreshed() {
 
         // Init modals
         M.Modal.init(document.querySelectorAll('.modal'));
-        // Init tabs
-        const tabs = M.Tabs.init(document.querySelectorAll('.tabs'));
 
         // Listen when the modal is open
         topCompaniesBtn.addEventListener('click', () => {
             // Update tab indicator
             window.setTimeout(() => {
+                // Init tabs every the modal opens
+                const tabs = M.Tabs.init(document.querySelectorAll('.tabs'));
+
                 tabs.forEach((tab) => {
                     tab.updateTabIndicator();
                 })
