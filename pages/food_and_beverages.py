@@ -71,6 +71,7 @@ def calculate_bubble(state_companies, max_state_companies):
     """
     bubble_size = state_companies / max_state_companies * 100 * 1.7
 
+    # Allow a maximum and minimum values
     if bubble_size < 10:
         return 10
     elif bubble_size > 40:
@@ -96,6 +97,36 @@ def filter_employees_ranges(rows, employees_ranges):
         return filtered
 
     return rows
+
+
+def filter_company_rows(rows, industries, employees_ranges, name_states, locality_names):
+    """
+    Filter companies by common params
+    :param rows: Company rows
+    :param industries: Iterable with industries or None for all
+    :param employees_ranges: Iterable with employees or None for all
+    :param name_states: Iterable with state names or None for all
+    :param locality_names: Iterable with localities or None for all
+    :return: Filtered rows dataframe
+    """
+    filtered = rows
+
+    # Filter by industries
+    if industries is not None:
+        filtered = filtered[filtered['Industry'].isin(industries)]
+
+    # Filter by employees ranges
+    filtered = filter_employees_ranges(rows, employees_ranges)
+
+    # Filter by name states
+    if name_states is not None:
+        filtered = filtered[filtered['Name_stateuniversity'].isin(name_states)]
+
+    # Filter by locality name
+    if locality_names is not None:
+        filtered = filtered[filtered['Locality'].isin(locality_names)]
+
+    return filtered
 
 
 def business_foundation_chart(employees_ranges, name_states, locality_names):
@@ -148,20 +179,19 @@ def business_foundation_chart(employees_ranges, name_states, locality_names):
 
 
 def get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names):
+    """
+    GEt top 10 for biggest companies
+    :param industries: Iterable with industries or None for all
+    :param employees_ranges: Iterable with employees or None for all
+    :param name_states: Iterable with state names or None for all
+    :param locality_names: Iterable with localities or None for all
+    :return:
+    """
     biggest_companies = companies_locations
 
-    # Filter by industries
-    if industries is not None:
-        biggest_companies = biggest_companies[biggest_companies['Industry'].isin(industries)]
-    # Filter by employees ranges
-    biggest_companies = filter_employees_ranges(biggest_companies, employees_ranges)
-    # Filter by name states
-    if name_states is not None:
-        biggest_companies = biggest_companies[biggest_companies['Name_stateuniversity'].isin(name_states)]
-    # Filter by locality name
-    if locality_names is not None:
-        biggest_companies = biggest_companies[biggest_companies['Locality'].isin(locality_names)]
-
+    # Filter rows
+    biggest_companies = filter_company_rows(biggest_companies, industries, employees_ranges, name_states, locality_names)
+    # Sort by current employee estimate
     biggest_companies = biggest_companies.sort_values(by=['Current employee estimate'], ascending=False).head(10)
 
     return biggest_companies
@@ -170,10 +200,10 @@ def get_top10_biggest_companies(industries, employees_ranges, name_states, local
 def biggest_companies_chart(industries, employees_ranges, name_states, locality_names):
     """
     Create biggest companies chart (top 10)
-    :param industries: Iterable with industries or None for all.
+    :param industries: Iterable with industries or None for all
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
-    :param name_states: Iterable with the state or None for all.
-    :param locality_names: Iterable with the localities or None for all.
+    :param name_states: Iterable with the state or None for all
+    :param locality_names: Iterable with the localities or None for all
     :return: Figure instance with the chart
     """
     # Fetch companies data
@@ -190,23 +220,23 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
 
 
 def companies_states_map(company_names, industries, employees_ranges, name_states, locality_names):
+    """
+    Create companies mapbox with the data computed
+    :param company_names: Iterable with company names or None for all
+    :param industries: Iterable with industries or None for all
+    :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
+    :param name_states: Iterable with the state or None for all
+    :param locality_names: Iterable with the localities or None for all
+    :return:
+    """
     # Set companies with locations
     companies_states = companies_locations
 
     # Filter by company names
     if company_names is not None:
         companies_states = companies_states[companies_states['Name'].isin(company_names)]
-    # Filter by industries
-    if industries is not None:
-        companies_states = companies_states[companies_states['Industry'].isin(industries)]
-    # Filter by employees ranges
-    companies_states = filter_employees_ranges(companies_states, employees_ranges)
-    # Filter by name states
-    if name_states is not None:
-        companies_states = companies_states[companies_states['Name_stateuniversity'].isin(name_states)]
-    # Filter by locality name
-    if locality_names is not None:
-        companies_states = companies_states[companies_states['Locality'].isin(locality_names)]
+    # Filter rows
+    companies_states = filter_company_rows(companies_states, industries, employees_ranges, name_states, locality_names)
 
     # Graphic objects
     data = []
@@ -329,8 +359,11 @@ def company_domain(company_name, domain):
 def top_10_companies_tabs(industries, employees_ranges, name_states, locality_names):
     """
     Create the HTML structure (tabs) with the top 10 companies, based on the industry type
-    :param industry: Industry type, can be all
-    :return: HTML elements
+    :param industries: Iterable with industries or None for all
+    :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
+    :param name_states: Iterable with the state or None for all
+    :param locality_names: Iterable with the localities or None for all
+    :return: Modal data with tabs elements
     """
     filtered_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names)
     tabs = []
