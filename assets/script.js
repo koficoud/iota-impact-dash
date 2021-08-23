@@ -26,8 +26,6 @@ document.addEventListener('DOMContentLoaded', function () {
 function domRefreshed() {
     // Top companies modal button
     const topCompaniesBtn = document.querySelector('#top-companies');
-    // All iframes that actually are used on top 10 companies modal
-    const iframes = document.querySelectorAll('iframe');
 
 
     if (topCompaniesBtn !== null && !topCompaniesBtn.classList.contains('loaded-element')) {
@@ -39,6 +37,9 @@ function domRefreshed() {
 
         // Listen when the modal is open
         topCompaniesBtn.addEventListener('click', () => {
+            // All iframes that actually are used on top 10 companies modal
+            const iframes = document.querySelectorAll('iframe');
+
             iframes.forEach((iframe) => {
                 // Set fallback URL
                 iframe.src = iframe.dataset.fallback;
