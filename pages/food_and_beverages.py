@@ -190,7 +190,8 @@ def get_top10_biggest_companies(industries, employees_ranges, name_states, local
     biggest_companies = companies_locations
 
     # Filter rows
-    biggest_companies = filter_company_rows(biggest_companies, industries, employees_ranges, name_states, locality_names)
+    biggest_companies = filter_company_rows(biggest_companies, industries, employees_ranges, name_states,
+                                            locality_names)
     # Sort by current employee estimate
     biggest_companies = biggest_companies.sort_values(by=['Current employee estimate'], ascending=False).head(10)
 
@@ -215,6 +216,11 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
         x=biggest_companies['Current employee estimate'],
         y=biggest_companies['Name'],
         orientation='h'))
+
+    # Remove margins
+    fig.update_layout(
+        margin={'l': 0, 'r': 0, 't': 0, 'b': 0},
+    )
 
     return fig
 
@@ -350,10 +356,7 @@ def company_domain(company_name, domain):
     :param domain: The company URL
     :return:
     """
-    if domain == 'missing':
-        return 'https://www.bing.com/news/search?q={}&FORM=HDRSC6'.format(company_name)
-    else:
-        return 'https://{}'.format(domain)
+    return 'https://www.bing.com/news/search?q={}&FORM=HDRSC6'.format(company_name)
 
 
 def top_10_companies_tabs(industries, employees_ranges, name_states, locality_names):
@@ -408,14 +411,24 @@ def top_10_companies_tabs(industries, employees_ranges, name_states, locality_na
                         className='collection-item',
                         children='Current employees: {}'.format(row['Current employee estimate'])
                     ),
-                    html.Iframe(
-                        src=company_domain(row['Name'], row['Domain']),
-                        **{'data-fallback': company_domain(row['Name'], 'missing')},
-                        width='100%',
-                        height='500px',
-                        sandbox='allow-forms allow-scripts',
-                    )
+                    html.Li(
+                        className='collection-item',
+                        children=[
+                            html.A(
+                                href='https://{}'.format(row['Domain']),
+                                children='Web site: {}'.format(row['Domain']),
+                                target='_blank',
+                            )
+                        ],
+                    ),
                 ]),
+                html.Iframe(
+                    src='about:blank',
+                    **{'data-fallback': company_domain(row['Name'], 'missing')},
+                    width='100%',
+                    height='500px',
+                ),
+                html.P('s'),
             ])
         )
 
@@ -443,7 +456,7 @@ def company_names_options(search):
     # Perform search
     if search is not None:
         # Second find by contains
-        company_names = companies[companies['Name'].str.contains(search, na=False, case=False) == True].head(100)
+        company_names = companies[companies['Name'].str.contains(search, na=False, case=False) == True].head(50)
 
         # Append companies to options dropdown
         for company_name in company_names['Name']:
@@ -458,7 +471,7 @@ def company_names_options(search):
 @app.callback(
     [
         Output('company_names_dropdown', 'options'),
-        Output('company_names_dropdown', 'placeholder'),
+        Output('company_names_dropdown', 'value'),
     ],
     Input('company_name_input', 'value'))
 def update_company_names_dropdown(company_name):
@@ -468,9 +481,10 @@ def update_company_names_dropdown(company_name):
     :return:
     """
     company_names = company_names_options(company_name)
-    value = 'First perform a search'
+
+    value = ''
     if len(company_names) > 0:
-        value = '{} and {} more found...'.format(company_names[0]['value'], len(company_names))
+        value = [company['value'] for company in company_names]
 
     return company_names, value
 
