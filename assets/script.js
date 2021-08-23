@@ -39,6 +39,15 @@ function domRefreshed() {
 
         // Listen when the modal is open
         topCompaniesBtn.addEventListener('click', () => {
+            iframes.forEach((iframe) => {
+                if (!iframe.classList.contains('loaded-element')) {
+                    // Add loaded-element class to prevent multiples instances
+                    iframe.classList.add('loaded-element');
+                    // Set fallback URL
+                    iframe.src = iframe.dataset.fallback;
+                }
+            });
+
             // Update tab indicator
             window.setTimeout(() => {
                 // Init tabs every the modal opens
@@ -50,27 +59,4 @@ function domRefreshed() {
             }, 500);
         });
     }
-
-    iframes.forEach((iframe) => {
-        if (!iframe.classList.contains('loaded-element')) {
-            // Add loaded-element class to prevent multiples instances
-            iframe.classList.add('loaded-element');
-
-            /**
-             * Triggers when an iframe is loaded
-             */
-            const iframeLoaded = (event) => {
-                // If the iframe don't has window then was an error
-                if (event.target.contentWindow.window.length === 0) {
-                    // Set fallback URL
-                    iframe.src = iframe.dataset.fallback;
-
-                    // Unbind load listener
-                    iframe.removeEventListener('load', iframeLoaded)
-                }
-            }
-
-            iframe.addEventListener('load', iframeLoaded);
-        }
-    });
 }
