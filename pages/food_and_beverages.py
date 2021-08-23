@@ -116,7 +116,7 @@ def filter_company_rows(rows, industries, employees_ranges, name_states, localit
         filtered = filtered[filtered['Industry'].isin(industries)]
 
     # Filter by employees ranges
-    filtered = filter_employees_ranges(rows, employees_ranges)
+    filtered = filter_employees_ranges(filtered, employees_ranges)
 
     # Filter by name states
     if name_states is not None:
