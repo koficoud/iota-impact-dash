@@ -1,24 +1,70 @@
 .js-plotly-plot .plotly .modebar {
     left: 92px;
 }
+
 .descriptive-text {
     font-size: 12px;
     margin: 15px !important;
 }
+
 #top-companies {
     margin-top: 15px;
 }
+
 #map {
-    margin-bottom: 30px;
+    margin-bottom: 15px;
 }
+
 .container > div {
     visibility: visible !important;
 }
+
 .dash-spinner-container {
     background-color: transparent !important;
 }
+
 .dash-spinner.dash-sk-circle {
     background-color: #0d47a1;
     border: 5px solid #0d47a1;
     border-radius: 6px;
+}
+
+/* Adjust main container size */
+.container {
+    max-width: 1500px;
+}
+@media only screen and (min-width: 993px) {
+    .container {
+        width: 100%;
+    }
+}
+/* Adjust modal space on window */
+.modal {
+    max-height: 90%;
+}
+/* Modal 1 is for top 10 biggest companies */
+div#modal1 {
+    top: 30px !important;
+}
+.modal .modal-content {
+    padding: 24px;
+    height: 800px;
+}
+/* Custom tabs */
+ul.tabs {
+    height: 60px;
+}
+.tabs .tab a {
+    color: #0d47a1;
+}
+.tabs .tab a.active,
+.tabs .tab a:hover
+{
+    color: #052861;
+}
+.tabs .tab a:focus {
+    background-color: #d3e4f8 !important;
+}
+.tabs .indicator {
+    background-color: #0d47a1;
 }
