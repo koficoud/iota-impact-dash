@@ -27,7 +27,13 @@ app.layout = html.Div(className='container', children=[
         ]),
     ]),
     # Content container
-    html.Div(id='page-content')
+    dcc.Loading(
+        id='loading-1',
+        type='circle',
+        children=html.Div(id='page-content'),
+        fullscreen=True,
+        color='#FFF',
+    ),
 ])
 
 

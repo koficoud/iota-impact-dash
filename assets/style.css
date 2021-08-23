@@ -11,3 +11,14 @@
 #map {
     margin-bottom: 30px;
 }
+.container > div {
+    visibility: visible !important;
+}
+.dash-spinner-container {
+    background-color: transparent !important;
+}
+.dash-spinner.dash-sk-circle {
+    background-color: #0d47a1;
+    border: 5px solid #0d47a1;
+    border-radius: 6px;
+}
