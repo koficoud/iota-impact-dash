@@ -428,7 +428,6 @@ def top_10_companies_tabs(industries, employees_ranges, name_states, locality_na
                     width='100%',
                     height='500px',
                 ),
-                html.P('s'),
             ])
         )
 
