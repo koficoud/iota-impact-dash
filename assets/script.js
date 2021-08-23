@@ -40,12 +40,8 @@ function domRefreshed() {
         // Listen when the modal is open
         topCompaniesBtn.addEventListener('click', () => {
             iframes.forEach((iframe) => {
-                if (!iframe.classList.contains('loaded-element')) {
-                    // Add loaded-element class to prevent multiples instances
-                    iframe.classList.add('loaded-element');
-                    // Set fallback URL
-                    iframe.src = iframe.dataset.fallback;
-                }
+                // Set fallback URL
+                iframe.src = iframe.dataset.fallback;
             });
 
             // Update tab indicator
