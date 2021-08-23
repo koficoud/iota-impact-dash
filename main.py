@@ -2,7 +2,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import pages
-from app import app
+from app import app, server
 
 # Main wrapper
 app.layout = html.Div(className='container', children=[
