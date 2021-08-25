@@ -9,6 +9,7 @@ import pandas as pd
 from urllib.request import urlopen
 from app import app
 from dash.dependencies import Output, Input
+from dash import no_update
 
 """
 Get the initial files to extract the data.
@@ -61,7 +62,8 @@ Add the graphic object data to the Figure.
 The Figure will be inserted in the layout page.
 """
 
-dropdown_values = []
+# Set default dropdown values
+dropdown_values = (None, None, None, None)
 
 
 def calculate_bubble(state_companies, max_state_companies):
@@ -131,12 +133,14 @@ def filter_company_rows(rows, industries, employees_ranges, name_states, localit
     return filtered
 
 
-def business_foundation_chart(employees_ranges, name_states, locality_names):
+def business_foundation_chart(employees_ranges, name_states, locality_names, selected_point, soft_filters):
     """
     Create business foundation by year chart (top 5)
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
     :param name_states: Iterable with the state or None for all.
-    :param locality_names: Iterable with the localities or None for all.
+    :param locality_names: Iterable with the localities or None for all
+    :param selected_point:
+    :param soft_filters:
     :return: Figure instance with the chart
     """
     top_5 = ['Retail', 'Food and beverages', 'Restaurants', 'Food production', 'Wholesale']
@@ -153,6 +157,10 @@ def business_foundation_chart(employees_ranges, name_states, locality_names):
     # Filter by locality
     if locality_names is not None:
         years = years[years['Locality'].isin(locality_names)]
+
+    # Soft filter
+    if soft_filters is not None and soft_filters['State'] is not None:
+        years = years[years['State_y'] == soft_filters['State']]
 
     # Count companies in founded year groups
     years_groups = years.groupby(['Year founded', 'Industry'], as_index=False).size()
@@ -174,8 +182,48 @@ def business_foundation_chart(employees_ranges, name_states, locality_names):
         y='Companies',
         color='Industry',
         title='Business foundation by year (Top 5 industries)',
+        custom_data=['Year founded', 'Industry', 'Companies'],
+
     )
-    fig.update_traces(mode="markers+lines")
+
+    if selected_point is not None:
+        value_y = business_foundation_data[
+            (business_foundation_data['Year founded'] == selected_point['customdata'][0]) &
+            (business_foundation_data['Industry'] == selected_point['customdata'][1])
+        ].iloc[0]
+
+        fig.add_annotation(
+            x=selected_point['x'],
+            y=value_y['Companies'],
+            xref="x",
+            yref="y",
+            text='<b>Year:</b> {} <br><b>Industry:</b> {} <br>'.format(
+                selected_point['customdata'][0], selected_point['customdata'][1]),
+            showarrow=True,
+            font=dict(
+                family="Courier New, monospace",
+                size=12,
+                color="#ffffff"
+            ),
+            align="center",
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            arrowcolor="#636363",
+            ax=20,
+            ay=-30,
+            bordercolor="#c7c7c7",
+            borderwidth=2,
+            borderpad=4,
+            bgcolor="#ff7f0e",
+            opacity=0.8
+        )
+    fig.update_layout(
+        clickmode='event+select',
+    )
+    fig.update_traces(
+        mode="markers+lines",
+    )
 
     return fig
 
@@ -200,9 +248,10 @@ def get_top10_biggest_companies(industries, employees_ranges, name_states, local
     return biggest_companies
 
 
-def biggest_companies_chart(industries, employees_ranges, name_states, locality_names):
+def biggest_companies_chart(industries, employees_ranges, name_states, locality_names, soft_filter):
     """
     Create biggest companies chart (top 10)
+    :param soft_filter:
     :param industries: Iterable with industries or None for all
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
     :param name_states: Iterable with the state or None for all
@@ -212,6 +261,15 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
     # Fetch companies data
     biggest_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names) \
         .sort_values(by=['Current employee estimate'], ascending=True)
+
+    # Apply soft filter
+    if soft_filter is not None:
+        if soft_filter['State'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['State'] == soft_filter['State']]
+        if soft_filter['Year founded'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['Year founded'] == soft_filter['Year founded']]
+        if soft_filter['Industry'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['Industry'] == soft_filter['Industry']]
 
     # Create chart
     fig = go.Figure(go.Bar(
@@ -227,7 +285,8 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
     return fig
 
 
-def companies_states_map(company_names, industries, employees_ranges, name_states, locality_names):
+def companies_states_map(company_names, industries, employees_ranges, name_states, locality_names, selected_points,
+                         soft_filter):
     """
     Create companies mapbox with the data computed
     :param company_names: Iterable with company names or None for all
@@ -235,6 +294,8 @@ def companies_states_map(company_names, industries, employees_ranges, name_state
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
     :param name_states: Iterable with the state or None for all
     :param locality_names: Iterable with the localities or None for all
+    :param selected_points:
+    :param soft_filter:
     :return:
     """
     # Set companies with locations
@@ -245,6 +306,13 @@ def companies_states_map(company_names, industries, employees_ranges, name_state
     # Filter by company names
     if company_names is not None:
         companies_states = companies_states[companies_states['Name'].isin(company_names)]
+
+    # Apply soft filter
+    if soft_filter is not None:
+        if soft_filter['Year founded'] is not None:
+            companies_states = companies_states[companies_states['Year founded'] == soft_filter['Year founded']]
+        if soft_filter['Industry'] is not None:
+            companies_states = companies_states[companies_states['Industry'] == soft_filter['Industry']]
 
     # Graphic objects
     data = []
@@ -296,6 +364,8 @@ def companies_states_map(company_names, industries, employees_ranges, name_state
     data.append(go.Scattermapbox(
         lat=avg_employees_states['Latitude'],
         lon=avg_employees_states['Longitud'],
+        customdata=avg_employees_states['State_y'],
+        selectedpoints=selected_points,
         mode='markers',
         marker=go.scattermapbox.Marker(
             size=avg_employees_states_count['size'].apply(
@@ -328,6 +398,7 @@ def companies_states_map(company_names, industries, employees_ranges, name_state
         height=600,
         mapbox_center={'lat': 37.0902, 'lon': -95.7129},
         margin={'r': 0, 't': 0, 'l': 0, 'b': 0},
+        clickmode='event+select',
     )
 
     return map_figure
@@ -351,11 +422,10 @@ def category_employees(current_employees):
             return '{}{}'.format(employees_range[0], lte)
 
 
-def company_domain(company_name, domain):
+def company_domain(company_name):
     """
     Format company URL based on company name and bing search URL or simple return the domain
     :param company_name: The company name
-    :param domain: The company URL
     :return:
     """
     return 'https://www.bing.com/news/search?q={}&FORM=HDRSC6'.format(company_name)
@@ -426,7 +496,7 @@ def top_10_companies_tabs(industries, employees_ranges, name_states, locality_na
                 ]),
                 html.Iframe(
                     src='about:blank',
-                    **{'data-fallback': company_domain(row['Name'], 'missing')},
+                    **{'data-fallback': company_domain(row['Name'])},
                     width='100%',
                     height='500px',
                 ),
@@ -458,7 +528,6 @@ def company_names_options(search):
     if search is not None:
         company_names = companies_locations
         # First apply dropdown filter
-        print(dropdown_values)
         if len(dropdown_values) != 0:
             company_names = filter_company_rows(company_names, dropdown_values[0], dropdown_values[1],
                                                 dropdown_values[2], dropdown_values[3])
@@ -681,10 +750,36 @@ def update_dropdowns(company_names, industries, employees_ranges, state_names, l
         Input('range_employees_dropdown', 'value'),
         Input('states_dropdown', 'value'),
         Input('localities_dropdown', 'value'),
+        Input('map', 'selectedData'),
+        Input('left-chart', 'selectedData')
     ]
 )
-def update_graphs(company_names, industries, range_employees, state_names, localities):
+def update_graphs(company_names, industries, range_employees, state_names, localities, map_event,
+                  left_chart_event):
     global dropdown_values
+
+    # Default selected points
+    map_points = None
+    left_chart_point = None
+    # Set soft filters from graphs selections
+    soft_filters = {
+        'State': None,
+        'Year founded': None,
+        'Industry': None,
+    }
+    # Append selected map points
+    if map_event is not None:
+        # Append selected points
+        map_points = []
+
+        for point in map_event['points']:
+            map_points.append(point['pointNumber'])
+            soft_filters['State'] = point['customdata']
+    # Set selected point
+    if left_chart_event is not None:
+        left_chart_point = left_chart_event['points'][0]
+        soft_filters['Year founded'] = left_chart_event['points'][0]['customdata'][0]
+        soft_filters['Industry'] = left_chart_event['points'][0]['customdata'][1]
 
     ranges_values = {
         '1-50': (1, 50),
@@ -729,9 +824,9 @@ def update_graphs(company_names, industries, range_employees, state_names, local
                                                                       state_names, localities)
 
     return \
-        business_foundation_chart(employees_ranges, state_names, localities), \
-        biggest_companies_chart(industries, employees_ranges, state_names, localities), \
-        companies_states_map(company_names, industries, employees_ranges, state_names, localities), \
+        business_foundation_chart(employees_ranges, state_names, localities, left_chart_point, soft_filters), \
+        biggest_companies_chart(industries, employees_ranges, state_names, localities, soft_filters), \
+        companies_states_map(company_names, industries, employees_ranges, state_names, localities, map_points, soft_filters), \
         top_10_companies_tabs(industries, employees_ranges, state_names, localities), \
         modal_title, in_options, er_options, sn_options, lo_options
 
@@ -775,7 +870,10 @@ page = html.Div(className='row card', children=[
         ]),
         html.Div(className='col s12', children=[
             # Insert map on the HTML page
-            dcc.Graph(id='map', figure=companies_states_map(None, None, None, None, None)),
+            dcc.Graph(
+                id='map',
+                figure=companies_states_map(None, None, None, None, None, None, None),
+            ),
         ]),
         html.Div(className='col s8', children=[
             html.P(
@@ -806,10 +904,10 @@ page = html.Div(className='row card', children=[
             ]),
         ]),
         html.Div(className='col s8', children=[
-            dcc.Graph(id='left-chart', figure=business_foundation_chart(None, None, None))
+            dcc.Graph(id='left-chart', figure=business_foundation_chart(None, None, None, None, None))
         ]),
         html.Div(className='col s4', children=[
-            dcc.Graph(id='right-chart', figure=biggest_companies_chart(None, None, None, None))
+            dcc.Graph(id='right-chart', figure=biggest_companies_chart(None, None, None, None, None))
         ]),
     ]),
 ])
