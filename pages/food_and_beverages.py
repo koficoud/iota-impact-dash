@@ -61,6 +61,8 @@ Add the graphic object data to the Figure.
 The Figure will be inserted in the layout page.
 """
 
+dropdown_values = []
+
 
 def calculate_bubble(state_companies, max_state_companies):
     """
@@ -238,11 +240,11 @@ def companies_states_map(company_names, industries, employees_ranges, name_state
     # Set companies with locations
     companies_states = companies_locations
 
+    # Filter rows
+    companies_states = filter_company_rows(companies_states, industries, employees_ranges, name_states, locality_names)
     # Filter by company names
     if company_names is not None:
         companies_states = companies_states[companies_states['Name'].isin(company_names)]
-    # Filter rows
-    companies_states = filter_company_rows(companies_states, industries, employees_ranges, name_states, locality_names)
 
     # Graphic objects
     data = []
@@ -454,8 +456,15 @@ def company_names_options(search):
 
     # Perform search
     if search is not None:
+        company_names = companies_locations
+        # First apply dropdown filter
+        print(dropdown_values)
+        if len(dropdown_values) != 0:
+            company_names = filter_company_rows(company_names, dropdown_values[0], dropdown_values[1],
+                                                dropdown_values[2], dropdown_values[3])
+
         # Second find by contains
-        company_names = companies[companies['Name'].str.contains(search, na=False, case=False) == True].head(50)
+        company_names = company_names[company_names['Name'].str.contains(search, na=False, case=False) == True].head(50)
 
         # Append companies to options dropdown
         for company_name in company_names['Name']:
@@ -588,6 +597,71 @@ def localities_dropdown():
     )
 
 
+def update_dropdowns(company_names, industries, employees_ranges, state_names, localities):
+    """
+    Update the dropdowns options based on selected value for any dropdown
+    :param company_names: Company name input (this is not updated)
+    :param industries: Industries selected value
+    :param employees_ranges: Employees ranges selected value
+    :param state_names: State names selected value
+    :param localities: Localities selected value
+    :return: Update options for all dropdowns
+    """
+    # Filtered companies
+    fi_companies = companies_locations
+    # Industries options
+    in_options = []
+    # Employees ranges options
+    er_options = []
+    # State names options
+    sn_options = []
+    # Localities options
+    lo_options = []
+
+    # Filter by company names
+    if company_names is not None and len(company_names) != 0:
+        fi_companies = fi_companies[fi_companies['Name'].isin(company_names)]
+
+    # Filter by all dropdown selected values
+    fi_companies = filter_company_rows(fi_companies, industries, employees_ranges, state_names, localities)
+
+    # Extract unique values
+    in_results = fi_companies['Industry'].sort_values(ascending=True).unique()
+    er_results = []
+    sn_results = fi_companies['Name_stateuniversity'].sort_values(ascending=True).unique()
+    lo_results = fi_companies['Locality'].sort_values(ascending=True).unique()
+    # Set employees ranges results
+    for employees_range in employees_per_company:
+        founded = fi_companies[
+            fi_companies['Current employee estimate'].between(employees_range[0], employees_range[1])]
+        if not founded.empty:
+            er_results.append(employees_range[2])
+
+    # Set options lists
+    for result in in_results:
+        in_options.append({
+            'label': str(result),
+            'value': str(result),
+        })
+    for result in er_results:
+        er_options.append({
+            'label': result,
+            'value': result,
+        })
+    for result in sn_results:
+        sn_options.append({
+            'label': str(result),
+            'value': str(result),
+        })
+    for result in lo_results:
+        lo_options.append({
+            'label': str(result),
+            'value': str(result),
+        })
+
+    return in_options, er_options, sn_options, lo_options
+
+
 @app.callback(
     [
         Output('left-chart', 'figure'),
@@ -595,6 +669,11 @@ def localities_dropdown():
         Output('map', 'figure'),
         Output('top-10-companies', 'children'),
         Output('modal-title', 'children'),
+        # Update dropdown options
+        Output('industries_dropdown', 'options'),
+        Output('range_employees_dropdown', 'options'),
+        Output('states_dropdown', 'options'),
+        Output('localities_dropdown', 'options'),
     ],
     [
         Input('company_names_dropdown', 'value'),
@@ -605,6 +684,8 @@ def localities_dropdown():
     ]
 )
 def update_graphs(company_names, industries, range_employees, state_names, localities):
+    global dropdown_values
+
     ranges_values = {
         '1-50': (1, 50),
         '51-200': (51, 200),
@@ -640,12 +721,19 @@ def update_graphs(company_names, industries, range_employees, state_names, local
 
     modal_title = 'Top 10 companies {}'.format(industries_label)
 
+    # Update dropdown global values
+    dropdown_values = (industries, employees_ranges, state_names, localities)
+
+    # Dropdown options updated
+    in_options, er_options, sn_options, lo_options = update_dropdowns(company_names, industries, employees_ranges,
+                                                                      state_names, localities)
+
     return \
         business_foundation_chart(employees_ranges, state_names, localities), \
         biggest_companies_chart(industries, employees_ranges, state_names, localities), \
         companies_states_map(company_names, industries, employees_ranges, state_names, localities), \
         top_10_companies_tabs(industries, employees_ranges, state_names, localities), \
-        modal_title
+        modal_title, in_options, er_options, sn_options, lo_options
 
 
 # The food and beverages page
