@@ -228,7 +228,7 @@ def business_foundation_chart(employees_ranges, name_states, locality_names, sel
     return fig
 
 
-def get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names):
+def get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, soft_filter):
     """
     GEt top 10 for biggest companies
     :param industries: Iterable with industries or None for all
@@ -242,6 +242,16 @@ def get_top10_biggest_companies(industries, employees_ranges, name_states, local
     # Filter rows
     biggest_companies = filter_company_rows(biggest_companies, industries, employees_ranges, name_states,
                                             locality_names)
+
+    # Apply soft filter
+    if soft_filter is not None:
+        if soft_filter['State'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['State_y'] == soft_filter['State']]
+        if soft_filter['Year founded'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['Year founded'] == soft_filter['Year founded']]
+        if soft_filter['Industry'] is not None:
+            biggest_companies = biggest_companies[biggest_companies['Industry'] == soft_filter['Industry']]
+
     # Sort by current employee estimate
     biggest_companies = biggest_companies.sort_values(by=['Current employee estimate'], ascending=False).head(10)
 
@@ -259,17 +269,8 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
     :return: Figure instance with the chart
     """
     # Fetch companies data
-    biggest_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names) \
+    biggest_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, soft_filter) \
         .sort_values(by=['Current employee estimate'], ascending=True)
-
-    # Apply soft filter
-    if soft_filter is not None:
-        if soft_filter['State'] is not None:
-            biggest_companies = biggest_companies[biggest_companies['State'] == soft_filter['State']]
-        if soft_filter['Year founded'] is not None:
-            biggest_companies = biggest_companies[biggest_companies['Year founded'] == soft_filter['Year founded']]
-        if soft_filter['Industry'] is not None:
-            biggest_companies = biggest_companies[biggest_companies['Industry'] == soft_filter['Industry']]
 
     # Create chart
     fig = go.Figure(go.Bar(
@@ -440,7 +441,7 @@ def top_10_companies_tabs(industries, employees_ranges, name_states, locality_na
     :param locality_names: Iterable with the localities or None for all
     :return: Modal data with tabs elements
     """
-    filtered_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names)
+    filtered_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, None)
     tabs = []
     tabs_content = []
 
