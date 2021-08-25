@@ -588,7 +588,7 @@ def industries_dropdown():
     return dcc.Dropdown(
         options=options,
         id='industries_dropdown',
-        placeholder='Industries',
+        placeholder='Industries (all selected)',
         multi=True,
     )
 
@@ -610,7 +610,7 @@ def range_employees_dropdown():
     return dcc.Dropdown(
         options=options,
         id='range_employees_dropdown',
-        placeholder='Number of employees',
+        placeholder='Number of employees (all selected)',
         multi=True,
     )
 
@@ -636,7 +636,7 @@ def states_dropdown():
     return dcc.Dropdown(
         options=options,
         id='states_dropdown',
-        placeholder='States',
+        placeholder='States (all selected)',
         multi=True,
     )
 
@@ -662,7 +662,7 @@ def localities_dropdown():
     return dcc.Dropdown(
         options=options,
         id='localities_dropdown',
-        placeholder='Localities',
+        placeholder='Localities (all selected)',
         multi=True,
     )
 
@@ -693,12 +693,12 @@ def update_dropdowns(company_names, industries, employees_ranges, state_names, l
         fi_companies = fi_companies[fi_companies['Name'].isin(company_names)]
 
     # Filter by all dropdown selected values
-    fi_companies = filter_company_rows(fi_companies, industries, employees_ranges, state_names, localities)
+    fi_companies = filter_company_rows(fi_companies, industries, None, state_names, None)
 
     # Extract unique values
-    in_results = fi_companies['Industry'].sort_values(ascending=True).unique()
+    in_results = companies_locations['Industry'].sort_values(ascending=True).unique()
     er_results = []
-    sn_results = fi_companies['Name_stateuniversity'].sort_values(ascending=True).unique()
+    sn_results = companies_locations['Name_stateuniversity'].sort_values(ascending=True).unique()
     lo_results = fi_companies['Locality'].sort_values(ascending=True).unique()
     # Set employees ranges results
     for employees_range in employees_per_company:
@@ -850,7 +850,7 @@ page = html.Div(className='row card', children=[
                 dcc.Dropdown(
                     options=[],
                     id='company_names_dropdown',
-                    placeholder='Company name results...',
+                    placeholder='All companies are selected',
                     multi=True,
                 ),
             ]),
