@@ -9,7 +9,6 @@ import pandas as pd
 from urllib.request import urlopen
 from app import app
 from dash.dependencies import Output, Input
-from dash import no_update
 
 """
 Get the initial files to extract the data.
@@ -190,7 +189,7 @@ def business_foundation_chart(employees_ranges, name_states, locality_names, sel
         value_y = business_foundation_data[
             (business_foundation_data['Year founded'] == selected_point['customdata'][0]) &
             (business_foundation_data['Industry'] == selected_point['customdata'][1])
-        ].iloc[0]
+            ].iloc[0]
 
         fig.add_annotation(
             x=selected_point['x'],
@@ -235,6 +234,7 @@ def get_top10_biggest_companies(industries, employees_ranges, name_states, local
     :param employees_ranges: Iterable with employees or None for all
     :param name_states: Iterable with state names or None for all
     :param locality_names: Iterable with localities or None for all
+    :param soft_filter:
     :return:
     """
     biggest_companies = companies_locations
@@ -269,7 +269,8 @@ def biggest_companies_chart(industries, employees_ranges, name_states, locality_
     :return: Figure instance with the chart
     """
     # Fetch companies data
-    biggest_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, soft_filter) \
+    biggest_companies = \
+        get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, soft_filter) \
         .sort_values(by=['Current employee estimate'], ascending=True)
 
     # Create chart
@@ -432,16 +433,18 @@ def company_domain(company_name):
     return 'https://www.bing.com/news/search?q={}&FORM=HDRSC6'.format(company_name)
 
 
-def top_10_companies_tabs(industries, employees_ranges, name_states, locality_names):
+def top_10_companies_tabs(industries, employees_ranges, name_states, locality_names, soft_filter):
     """
     Create the HTML structure (tabs) with the top 10 companies, based on the industry type
     :param industries: Iterable with industries or None for all
     :param employees_ranges: Tuple with ranges or None for all (e.g. (1, 50))
     :param name_states: Iterable with the state or None for all
     :param locality_names: Iterable with the localities or None for all
-    :return: Modal data with tabs elements
+    :param soft_filter: Soft filter
+    :return: HTML elements
     """
-    filtered_companies = get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, None)
+    filtered_companies = \
+        get_top10_biggest_companies(industries, employees_ranges, name_states, locality_names, soft_filter)
     tabs = []
     tabs_content = []
 
@@ -827,8 +830,9 @@ def update_graphs(company_names, industries, range_employees, state_names, local
     return \
         business_foundation_chart(employees_ranges, state_names, localities, left_chart_point, soft_filters), \
         biggest_companies_chart(industries, employees_ranges, state_names, localities, soft_filters), \
-        companies_states_map(company_names, industries, employees_ranges, state_names, localities, map_points, soft_filters), \
-        top_10_companies_tabs(industries, employees_ranges, state_names, localities), \
+        companies_states_map(company_names, industries, employees_ranges, state_names, localities, map_points,
+                             soft_filters), \
+        top_10_companies_tabs(industries, employees_ranges, state_names, localities, soft_filters), \
         modal_title, in_options, er_options, sn_options, lo_options
 
 
@@ -900,7 +904,7 @@ page = html.Div(className='row card', children=[
             html.Div(id='modal1', className='modal', children=[
                 html.Div(className='modal-content', children=[
                     html.H4(id='modal-title', children='Top 10 companies All'),
-                    html.Div(id='top-10-companies', children=top_10_companies_tabs(None, None, None, None)),
+                    html.Div(id='top-10-companies', children=top_10_companies_tabs(None, None, None, None, None)),
                 ]),
             ]),
         ]),
